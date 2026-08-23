@@ -11,6 +11,8 @@ android {
         versionCode 10000
         versionName '1.0.0'
         ndk { abiFilters 'arm64-v8a' }
+        // Enable multidex (safe for debugging; minSdk >= 21 has native support)
+        multiDexEnabled true
     }
 
     // --- NEW: signing config (reads secrets or project properties) ---
@@ -27,8 +29,10 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            // TEMPORARY: disable minification and shrinking to make crash debugging easier.
+            // Re-enable after we determine the cause and add any required -keep rules.
+            minifyEnabled false
+            shrinkResources false
             debuggable false
             jniDebuggable false
             zipAlignEnabled true
@@ -48,4 +52,9 @@ android {
             excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
         }
     }
+}
+
+// Add multidex dependency to help avoid class-not-found issues on startup (safe for debugging)
+dependencies {
+    implementation 'androidx.multidex:multidex:2.0.1'
 }
