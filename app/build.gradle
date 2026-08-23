@@ -10,58 +10,73 @@ android {
         applicationId 'com.universal.performance'
         minSdk 23
         targetSdk 36
-        versionCode 10000
-        versionName '1.0.0'
-        ndk { abiFilters 'arm64-v8a' }
-        // Enable multidex (safe for debugging; minSdk >= 21 has native support)
-        multiDexEnabled true
+
+        versionCode 10001
+        versionName '1.0.1'
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
     }
 
-    // --- NEW: signing config (reads secrets or project properties) ---
     signingConfigs {
-    release {
-        def keystorePath = System.getenv("KEYSTORE_PATH")
+        release {
+            def keystorePath = System.getenv("KEYSTORE_PATH")
 
-        if (keystorePath != null && !keystorePath.isEmpty()) {
-            storeFile file(keystorePath)
-            storePassword System.getenv("KEYSTORE_PASSWORD")
-            keyAlias System.getenv("KEY_ALIAS")
-            keyPassword System.getenv("KEY_PASSWORD")
+            if (keystorePath != null && !keystorePath.isEmpty()) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
         }
     }
-}
 
-buildTypes {
-    release {
-        minifyEnabled false
-        shrinkResources false
-        debuggable false
-        jniDebuggable false
-        zipAlignEnabled true
+    buildTypes {
 
-        if (System.getenv("KEYSTORE_PATH") != null) {
-            signingConfig signingConfigs.release
+        debug {
+            minifyEnabled false
+            shrinkResources false
+            debuggable true
         }
 
-        proguardFiles(
-            getDefaultProguardFile("proguard-android-optimize.txt"),
-            "proguard-rules.pro"
-        )
+        release {
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+            jniDebuggable false
+            zipAlignEnabled true
+
+            /*
+             * Only attach the signing configuration when the
+             * GitHub Actions signing environment is available.
+             *
+             * This prevents a local build from failing simply
+             * because a private release keystore is unavailable.
+             */
+            if (System.getenv("KEYSTORE_PATH") != null &&
+                    !System.getenv("KEYSTORE_PATH").isEmpty()) {
+                signingConfig signingConfigs.release
+            }
+
+            proguardFiles(
+                getDefaultProguardFile(
+                    'proguard-android-optimize.txt'
+                ),
+                'proguard-rules.pro'
+            )
+        }
     }
 
-    debug {
-        minifyEnabled false
-        shrinkResources false
-    }
-}
     packaging {
         resources {
-            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt'
+            ]
         }
     }
-}
-
-// Add multidex dependency to help avoid class-not-found issues on startup (safe for debugging)
-dependencies {
-    implementation 'androidx.multidex:multidex:2.0.1'
 }
