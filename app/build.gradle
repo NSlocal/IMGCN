@@ -13,6 +13,18 @@ android {
         ndk { abiFilters 'arm64-v8a' }
     }
 
+    // --- NEW: signing config (reads secrets or project properties) ---
+    signingConfigs {
+        release {
+            // prefer explicit env var KEYSTORE_PATH, otherwise look for ./keystore.jks in workspace
+            def keystorePath = System.getenv("KEYSTORE_PATH") ?: rootProject.file("keystore.jks")
+            storeFile file(keystorePath)
+            storePassword project.findProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
+            keyAlias project.findProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+            keyPassword project.findProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
@@ -20,6 +32,8 @@ android {
             debuggable false
             jniDebuggable false
             zipAlignEnabled true
+            // use the release signingConfig
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     'proguard-rules.pro'
         }
