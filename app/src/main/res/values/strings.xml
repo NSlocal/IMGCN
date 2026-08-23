@@ -1,0 +1,5 @@
+<resources>
+<string name="app_name">Universal Performance</string>
+<string name="service_channel">Performance Service</string>
+<string name="service_description">Low overhead UI performance service</string>
+</resources>
