@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 jobs:
   build:
@@ -32,7 +32,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Verify Gradle Wrapper
         run: |
