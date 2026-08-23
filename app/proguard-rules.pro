@@ -1,4 +1,4 @@
--keepattributes *Annotation*
+keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
@@ -19,9 +19,3 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
-
-# Do not use:
-# -keep class ** { *; }
-# -dontshrink
-# -dontoptimize
-# -dontobfuscate
