@@ -11,7 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    # make secrets available as env (values come from repository Secrets)
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -32,65 +31,69 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Gradle wrapper
+        run: ./gradlew --version
 
       # Restore keystore from secret and ensure it's accessible
       - name: Restore keystore
+        id: restore_keystore
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
+          if [ -z "${KEYSTORE_BASE64}" ]; then
             echo "⚠️  WARNING: KEYSTORE_BASE64 secret is not configured"
-            echo "Building unsigned APK instead."
-            echo ""
-            echo "To enable signing, configure these repository secrets:"
-            echo "1. Navigate to: https://github.com/${{ github.repository }}/settings/secrets/actions"
-            echo "2. Create the following repository secrets:"
-            echo "   - KEYSTORE_BASE64: Base64-encoded keystore file content"
-            echo "   - KEYSTORE_PASSWORD: Your keystore password"
-            echo "   - KEY_ALIAS: Your signing key alias"
-            echo "   - KEY_PASSWORD: Your signing key password"
-            echo ""
-            echo "To generate a keystore, run:"
-            echo "  keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000"
-            echo "  base64 keystore.jks | tr -d '\n'"
+            echo "Building unsigned debug APK instead."
             echo ""
           else
             echo "✓ Decoding KEYSTORE_BASE64 secret..."
             echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
-            
+
             if [ ! -f keystore.jks ]; then
               echo "❌ ERROR: Failed to create keystore.jks"
               echo "The Base64 decoding may have failed. Please verify the KEYSTORE_BASE64 secret is correct."
               exit 1
             fi
-            
+
             echo "✓ Keystore restored successfully"
             ls -lh keystore.jks
-            
-            # Set KEYSTORE_PATH for Gradle to use
+
+            # Export path for Gradle signing properties
             echo "KEYSTORE_PATH=$(pwd)/keystore.jks" >> $GITHUB_ENV
+            echo "keystore_present=true" >> $GITHUB_ENV
           fi
         shell: bash
 
-      - name: Build ARM64 Debug APK (Unsigned)
-        # Build unsigned debug APK when keystore is not available
-        run: gradle :app:assembleDebug --no-daemon
-
-      - name: Verify APK
+      - name: Build APK(s)
         run: |
-          ls -lh app/build/outputs/apk/debug/
-          file app/build/outputs/apk/debug/*.apk
+          set -e
+          if [ -f keystore.jks ]; then
+            echo "Building signed release APK..."
+            ./gradlew assembleRelease -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+              -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$KEY_PASSWORD" --no-daemon
+          else
+            echo "Building unsigned debug APK..."
+            ./gradlew :app:assembleDebug --no-daemon
+          fi
+        shell: bash
+
+      - name: Verify APK(s)
+        run: |
+          echo "Listing debug APKs (if any):"
+          ls -lh app/build/outputs/apk/debug/ || true
+          echo "Listing release APKs (if any):"
+          ls -lh app/build/outputs/apk/release/ || true
+          echo "All APK files found:"
+          find app/build/outputs/apk -type f -name "*.apk" -print || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: universal-performance-arm64
-          path: app/build/outputs/apk/debug/*.apk
+          name: universal-performance-apks
+          path: app/build/outputs/apk/**/*.apk
 
-      - name: GitHub Release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: app/build/outputs/apk/debug/*.apk
-          
+          files: app/build/outputs/apk/**/*.apk
