@@ -31,8 +31,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Generate Gradle wrapper if missing
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.0.2
+          fi
+
       - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew || echo "gradlew not found, skipping chmod"
+        run: chmod +x ./gradlew
 
       - name: Build (debug)
         # We build only debug to avoid release signing issues in CI. If you want to build release,
@@ -47,3 +53,4 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          
