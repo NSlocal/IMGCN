@@ -1,9 +1,11 @@
+Universal Performance
+Package: com.universal.performance
+Version: 1.0.0
+
 Speed Drifters
-Package=com.garena.game.fctw
-Version=1.54.0.26207
+Package: com.garena.game.fctw
+Version: 1.54.0.26207
 
 QQ飞车
-Package=com.tencent.tmgp.speedmobile
-Version=1.58.0.50557
-
-Reference metadata only; no proprietary binaries included.
+Package: com.tencent.tmgp.speedmobile
+Version: 1.58.0.50557
