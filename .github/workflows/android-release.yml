@@ -1,10 +1,9 @@
-name: Android ARM64 Optimized Release
+name: Universal Performance Android Release
 
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
 
 permissions:
   contents: write
@@ -12,43 +11,39 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
-      - name: Setup Android SDK
+      - name: Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
+      - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build ARM64 release APK
+      - name: Build ARM64 Release APK
         run: gradle :app:assembleRelease --no-daemon
 
-      - name: Verify output
+      - name: Verify APK
         run: |
           ls -lh app/build/outputs/apk/release/
           file app/build/outputs/apk/release/*.apk
 
-      - name: Upload APK
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arm64-performance-release
+          name: universal-performance-arm64
           path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
 
-      - name: Publish GitHub Release
+      - name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
-          
