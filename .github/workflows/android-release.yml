@@ -34,6 +34,14 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Verify Gradle Wrapper
+        run: |
+          echo "Checking gradle wrapper files..."
+          ls -la gradle/wrapper/
+          file gradle/wrapper/gradle-wrapper.jar || echo "gradle-wrapper.jar not found"
+          echo "Checking gradlew..."
+          file ./gradlew
+
       - name: Clean
         run: ./gradlew clean
 
@@ -58,4 +66,4 @@ jobs:
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
-
+          
