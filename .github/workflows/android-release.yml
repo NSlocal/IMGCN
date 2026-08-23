@@ -41,6 +41,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Regenerate Gradle Wrapper
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Gradle wrapper JAR missing, regenerating..."
+            ./gradlew wrapper --gradle-version 8.5
+          fi
+
       - name: Verify Gradle Wrapper
         run: |
           echo "Checking gradle wrapper files..."
@@ -72,4 +79,3 @@ jobs:
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
-          
