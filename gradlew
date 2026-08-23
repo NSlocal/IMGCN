@@ -80,7 +80,7 @@ case "`uname`" in
     ;;
 esac
 
-ORIGINAL_IFS=$IFS
+OVER_ORIGINAL_IFS=$IFS
 IFS=$'\n'
 for arg in "$@" ; do
   IFS=$ORIGINAL_IFS
@@ -165,7 +165,7 @@ fi
 
 # Escape application args
 save () {
-    for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
+    for i do printf %s\\n "$i" | sed "s/'/'\\\\\\''/g;1s/^/'/;\$s/\$/' \\\\\\/" ; done
     echo " "
 }
 APP_ARGS=`save "$@"`
