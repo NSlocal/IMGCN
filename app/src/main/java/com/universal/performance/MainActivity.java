@@ -26,17 +26,42 @@ public class MainActivity extends Activity {
             window.setAttributes(p);
         }
 
+        // Request POST_NOTIFICATIONS on Android 13+ if needed. If we must request,
+        // postpone starting the PerformanceService until we get the permission result.
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
                     PERMISSION_REQUEST);
+            return; // wait for permission result before starting the service
         }
 
-        Intent service = new Intent(this, PerformanceService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            startForegroundService(service);
-        else startService(service);
+        // If we already have permission (or on older platforms), start the service now.
+        startPerformanceService();
+    }
+
+    private void startPerformanceService() {
+        try {
+            Intent service = new Intent(this, PerformanceService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                startForegroundService(service);
+            else startService(service);
+        } catch (Throwable t) {
+            // Avoid letting service startup exceptions crash the app process.
+            // Log to console (adb logcat) for debugging.
+            t.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST) {
+            // Regardless of grant/deny, continue and start the service in a safe way.
+            startPerformanceService();
+        }
+        // Other permission requests (optional permissions) are handled elsewhere.
+        // If you want the optional-permissions flow to also start the service, add handling here.
     }
 
     public void requestOptionalPermissions() {
