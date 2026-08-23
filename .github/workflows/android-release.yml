@@ -41,7 +41,7 @@ jobs:
           test -f gradle/wrapper/gradle-wrapper.properties && echo "✓ gradle-wrapper.properties found" || echo "✗ gradle-wrapper.properties missing"
           test -f ./gradlew && echo "✓ gradlew found" || echo "✗ gradlew missing"
           echo "Gradle wrapper version:"
-          grep "distributionUrl" gradle/wrapper/gradle-wrapper.properties
+          cat gradle/wrapper/gradle-wrapper.properties | grep "distributionUrl"
 
       - name: Clean
         run: ./gradlew clean
