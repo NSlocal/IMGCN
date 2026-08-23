@@ -39,12 +39,13 @@ jobs:
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "No KEYSTORE_BASE64 provided; skipping keystore restore"
-            exit 1
+            echo "KEYSTORE_PATH=" >> $GITHUB_ENV
+          else
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
+            echo "Keystore written to $GITHUB_WORKSPACE/keystore.jks"
+            # expose path to subsequent steps
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
           fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
-          echo "Keystore written to $GITHUB_WORKSPACE/keystore.jks"
-          # expose path to subsequent steps
-          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
         shell: bash
 
       - name: Build ARM64 Release APK
