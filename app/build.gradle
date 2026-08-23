@@ -23,11 +23,22 @@ android {
         release {
             def keystorePath = System.getenv("KEYSTORE_PATH")
 
-            if (keystorePath != null && !keystorePath.isEmpty()) {
+            if (keystorePath != null &&
+                !keystorePath.isEmpty()) {
+
                 storeFile file(keystorePath)
-                storePassword System.getenv("KEYSTORE_PASSWORD")
-                keyAlias System.getenv("KEY_ALIAS")
-                keyPassword System.getenv("KEY_PASSWORD")
+
+                storePassword System.getenv(
+                    "KEYSTORE_PASSWORD"
+                )
+
+                keyAlias System.getenv(
+                    "KEY_ALIAS"
+                )
+
+                keyPassword System.getenv(
+                    "KEY_PASSWORD"
+                )
             }
         }
     }
@@ -48,14 +59,17 @@ android {
             zipAlignEnabled true
 
             /*
-             * Only attach the signing configuration when the
-             * GitHub Actions signing environment is available.
+             * Do not force a missing keystore.
              *
-             * This prevents a local build from failing simply
-             * because a private release keystore is unavailable.
+             * If GitHub Actions provides KEYSTORE_PATH,
+             * Gradle signs the Release APK.
+             *
+             * If it is absent, assembleRelease can still
+             * create an unsigned Release APK for testing.
              */
             if (System.getenv("KEYSTORE_PATH") != null &&
-                    !System.getenv("KEYSTORE_PATH").isEmpty()) {
+                !System.getenv("KEYSTORE_PATH").isEmpty()) {
+
                 signingConfig signingConfigs.release
             }
 
