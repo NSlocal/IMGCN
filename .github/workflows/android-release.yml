@@ -41,7 +41,7 @@ jobs:
           test -f gradle/wrapper/gradle-wrapper.properties && echo "✓ gradle-wrapper.properties found" || echo "✗ gradle-wrapper.properties missing"
           test -f ./gradlew && echo "✓ gradlew found" || echo "✗ gradlew missing"
           echo "Gradle wrapper version:"
-          cat gradle/wrapper/gradle-wrapper.properties | grep "distributionUrl"
+          grep "distributionUrl" gradle/wrapper/gradle-wrapper.properties
 
       - name: Clean
         run: ./gradlew clean
@@ -67,4 +67,3 @@ jobs:
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
-          
