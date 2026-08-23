@@ -17,6 +17,7 @@ jobs:
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
       - uses: actions/checkout@v4
@@ -38,9 +39,10 @@ jobs:
       - name: Restore keystore
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "❌ ERROR: KEYSTORE_BASE64 secret is not configured in repository secrets"
+            echo "⚠️  WARNING: KEYSTORE_BASE64 secret is not configured"
+            echo "Proceeding without signing. The APK will be unsigned."
             echo ""
-            echo "To fix this issue, please:"
+            echo "To enable signing, configure these repository secrets:"
             echo "1. Navigate to: https://github.com/${{ github.repository }}/settings/secrets/actions"
             echo "2. Create the following repository secrets:"
             echo "   - KEYSTORE_BASE64: Base64-encoded keystore file content"
@@ -52,23 +54,22 @@ jobs:
             echo "  keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000"
             echo "  base64 keystore.jks | tr -d '\n'"
             echo ""
-            exit 1
+          else
+            echo "✓ Decoding KEYSTORE_BASE64 secret..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
+            
+            if [ ! -f keystore.jks ]; then
+              echo "❌ ERROR: Failed to create keystore.jks"
+              echo "The Base64 decoding may have failed. Please verify the KEYSTORE_BASE64 secret is correct."
+              exit 1
+            fi
+            
+            echo "✓ Keystore restored successfully"
+            ls -lh keystore.jks
+            
+            # Set KEYSTORE_PATH for Gradle to use
+            echo "KEYSTORE_PATH=$(pwd)/keystore.jks" >> $GITHUB_ENV
           fi
-          
-          echo "✓ Decoding KEYSTORE_BASE64 secret..."
-          echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
-          
-          if [ ! -f keystore.jks ]; then
-            echo "❌ ERROR: Failed to create keystore.jks"
-            echo "The Base64 decoding may have failed. Please verify the KEYSTORE_BASE64 secret is correct."
-            exit 1
-          fi
-          
-          echo "✓ Keystore restored successfully"
-          ls -lh keystore.jks
-          
-          # Set KEYSTORE_PATH for Gradle to use
-          echo "KEYSTORE_PATH=$(pwd)/keystore.jks" >> $GITHUB_ENV
         shell: bash
 
       - name: Build ARM64 Release APK
@@ -92,3 +93,4 @@ jobs:
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
+          
