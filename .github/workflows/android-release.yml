@@ -34,20 +34,39 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # --- FIXED: restore keystore from secret and ensure it's accessible ---
+      # Restore keystore from secret and ensure it's accessible
       - name: Restore keystore
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "ERROR: KEYSTORE_BASE64 secret is not configured in repository secrets"
+            echo "❌ ERROR: KEYSTORE_BASE64 secret is not configured in repository secrets"
+            echo ""
+            echo "To fix this issue, please:"
+            echo "1. Navigate to: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "2. Create the following repository secrets:"
+            echo "   - KEYSTORE_BASE64: Base64-encoded keystore file content"
+            echo "   - KEYSTORE_PASSWORD: Your keystore password"
+            echo "   - KEY_ALIAS: Your signing key alias"
+            echo "   - KEY_PASSWORD: Your signing key password"
+            echo ""
+            echo "To generate a keystore, run:"
+            echo "  keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000"
+            echo "  base64 keystore.jks | tr -d '\n'"
+            echo ""
             exit 1
           fi
+          
+          echo "✓ Decoding KEYSTORE_BASE64 secret..."
           echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
+          
           if [ ! -f keystore.jks ]; then
-            echo "ERROR: Failed to create keystore.jks"
+            echo "❌ ERROR: Failed to create keystore.jks"
+            echo "The Base64 decoding may have failed. Please verify the KEYSTORE_BASE64 secret is correct."
             exit 1
           fi
-          echo "Keystore restored successfully to $(pwd)/keystore.jks"
+          
+          echo "✓ Keystore restored successfully"
           ls -lh keystore.jks
+          
           # Set KEYSTORE_PATH for Gradle to use
           echo "KEYSTORE_PATH=$(pwd)/keystore.jks" >> $GITHUB_ENV
         shell: bash
