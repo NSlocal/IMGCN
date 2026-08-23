@@ -1,0 +1,9 @@
+Profile: Apple A18 Pro
+- Reference/profile metadata only.
+- iOS binaries are not APK-compatible.
+- No Apple GPU driver code is included.
+
+Profile: MediaTek
+- Generic Android profile.
+- Uses standard Android graphics APIs.
+- No overclock, thermal bypass, anti-cheat bypass, or GPU driver patching.
