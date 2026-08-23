@@ -19,36 +19,41 @@ android {
 
     // --- NEW: signing config (reads secrets or project properties) ---
     signingConfigs {
-        release {
-            // prefer explicit env var KEYSTORE_PATH, otherwise look for ./keystore.jks in workspace
-            def keystorePath = System.getenv("KEYSTORE_PATH") ?: rootProject.file("keystore.jks")
+    release {
+        def keystorePath = System.getenv("KEYSTORE_PATH")
+
+        if (keystorePath != null && !keystorePath.isEmpty()) {
             storeFile file(keystorePath)
-            storePassword project.findProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
-            keyAlias project.findProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
-            keyPassword project.findProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+            storePassword System.getenv("KEYSTORE_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS")
+            keyPassword System.getenv("KEY_PASSWORD")
         }
     }
+}
 
-    buildTypes {
-        release {
-            // TEMPORARY: disable minification and shrinking to make crash debugging easier.
-            // Re-enable after we determine the cause and add any required -keep rules.
-            minifyEnabled false
-            shrinkResources false
-            debuggable false
-            jniDebuggable false
-            zipAlignEnabled true
-            // use the release signingConfig
+buildTypes {
+    release {
+        minifyEnabled false
+        shrinkResources false
+        debuggable false
+        jniDebuggable false
+        zipAlignEnabled true
+
+        if (System.getenv("KEYSTORE_PATH") != null) {
             signingConfig signingConfigs.release
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                    'proguard-rules.pro'
         }
-        debug {
-            minifyEnabled false
-            shrinkResources false
-        }
+
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
+        )
     }
 
+    debug {
+        minifyEnabled false
+        shrinkResources false
+    }
+}
     packaging {
         resources {
             excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
