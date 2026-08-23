@@ -31,6 +31,15 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Generate Gradle wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            echo "Gradle wrapper not found. Generating..."
+            gradle wrapper
+          else
+            echo "Gradle wrapper found."
+          fi
+
       - name: Gradle wrapper
         run: ./gradlew --version
 
@@ -97,3 +106,4 @@ jobs:
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/**/*.apk
+          
