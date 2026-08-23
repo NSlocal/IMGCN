@@ -51,7 +51,7 @@ jobs:
 
           if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
             echo "Gradle wrapper JAR missing."
-            echo "Generating wrapper with system Gradle 8.10.2."
+            echo "Generating Gradle 8.10.2 wrapper."
 
             gradle wrapper \
               --gradle-version 8.10.2 \
@@ -71,30 +71,49 @@ jobs:
           ./gradlew clean --no-daemon
 
       # ------------------------------------------------------
-      # RESTORE PRIVATE SIGNING KEY
+      # OPTIONAL SIGNING
       # ------------------------------------------------------
 
-      - name: Restore release keystore
+      - name: Check release signing configuration
+        id: signing
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
 
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "ERROR:"
-            echo "KEYSTORE_BASE64 GitHub Secret is missing."
+          if [ -n "$KEYSTORE_BASE64" ] &&
+             [ -n "$KEYSTORE_PASSWORD" ] &&
+             [ -n "$KEY_ALIAS" ] &&
+             [ -n "$KEY_PASSWORD" ]; then
+
+            echo "signing=true" >> "$GITHUB_OUTPUT"
+
+            echo "$KEYSTORE_BASE64" | base64 --decode \
+              > "$GITHUB_WORKSPACE/keystore.jks"
+
+            test -s "$GITHUB_WORKSPACE/keystore.jks"
+
+            echo "Permanent release signing key restored."
+
+          else
+
+            echo "signing=false" >> "$GITHUB_OUTPUT"
+
+            echo "WARNING:"
+            echo "Release signing secrets are not configured."
+            echo "Building an UNSIGNED test Release APK."
             echo ""
-            echo "Create the secret before building a signed Release APK."
-            exit 1
+            echo "For a public update APK, configure:"
+            echo "KEYSTORE_BASE64"
+            echo "KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS"
+            echo "KEY_PASSWORD"
+
           fi
-
-          echo "$KEYSTORE_BASE64" | base64 --decode \
-            > "$GITHUB_WORKSPACE/keystore.jks"
-
-          test -s "$GITHUB_WORKSPACE/keystore.jks"
-
-          echo "Release keystore restored successfully."
 
       # ------------------------------------------------------
       # BUILD
@@ -107,8 +126,15 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          RELEASE_SIGNING_ENABLED: ${{ steps.signing.outputs.signing }}
         run: |
           set -euo pipefail
+
+          if [ "$RELEASE_SIGNING_ENABLED" = "true" ]; then
+            echo "Building SIGNED ARM64 Release APK."
+          else
+            echo "Building UNSIGNED ARM64 Release APK for testing."
+          fi
 
           ./gradlew \
             :app:assembleRelease \
@@ -116,10 +142,10 @@ jobs:
             --stacktrace
 
       # ------------------------------------------------------
-      # VERIFY
+      # VERIFY APK
       # ------------------------------------------------------
 
-      - name: Verify APK
+      - name: Verify ARM64 APK
         shell: bash
         run: |
           set -euo pipefail
@@ -128,7 +154,7 @@ jobs:
 
           test -d "$APK_DIR"
 
-          echo "Release directory:"
+          echo "Release output:"
           ls -lah "$APK_DIR"
 
           APK_COUNT=$(find "$APK_DIR" \
@@ -137,7 +163,7 @@ jobs:
             -name "*.apk" | wc -l)
 
           if [ "$APK_COUNT" -eq 0 ]; then
-            echo "ERROR: No APK produced."
+            echo "ERROR: No APK was produced."
             exit 1
           fi
 
@@ -145,7 +171,7 @@ jobs:
 
           for apk in "$APK_DIR"/*.apk; do
             echo "----------------------------------------"
-            echo "APK: $apk"
+            echo "$apk"
             ls -lh "$apk"
             file "$apk"
           done
