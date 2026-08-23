@@ -8,12 +8,10 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,55 +23,73 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Java 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
-      - name: Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Regenerate Gradle Wrapper
+      - name: Repair missing Gradle Wrapper
+        shell: bash
         run: |
+          set -euo pipefail
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "Gradle wrapper JAR missing, regenerating..."
-            ./gradlew wrapper --gradle-version 8.5
+            echo "gradle-wrapper.jar is missing; using system Gradle to generate it."
+            gradle wrapper --gradle-version 8.10.2 --distribution-type bin
           fi
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          echo "Gradle wrapper is ready."
 
       - name: Verify Gradle Wrapper
+        shell: bash
         run: |
-          echo "Checking gradle wrapper files..."
-          ls -la gradle/wrapper/ || echo "gradle/wrapper directory not found"
-          test -f ./gradlew && echo "✓ gradlew found" || echo "✗ gradlew missing"
-          test -f gradle/wrapper/gradle-wrapper.jar && echo "✓ gradle-wrapper.jar found" || echo "✗ gradle-wrapper.jar missing"
+          set -euo pipefail
+          chmod +x ./gradlew
+          ls -la gradle/wrapper/
+          ./gradlew --version
 
       - name: Clean
-        run: ./gradlew clean
+        run: ./gradlew clean --no-daemon
 
-      - name: Build ARM64 release
-        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: Build ARM64 Release APK
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Verify APK
+        shell: bash
         run: |
-          ls -lh app/build/outputs/apk/release/
-          file app/build/outputs/apk/release/*.apk
+          set -euo pipefail
+          APK_DIR=app/build/outputs/apk/release
+          test -d "$APK_DIR"
+          ls -lah "$APK_DIR"
+          APK_COUNT=$(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' | wc -l)
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: No APK was produced."
+            exit 1
+          fi
+          for apk in "$APK_DIR"/*.apk; do
+            file "$apk"
+          done
 
-      - name: Upload APK
+      - name: Upload ARM64 APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: universal-performance-arm64
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 14
 
-      - name: GitHub Release
+      - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
