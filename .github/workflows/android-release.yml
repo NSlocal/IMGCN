@@ -11,6 +11,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    # make secrets available as env (values come from repository Secrets)
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +34,21 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # --- NEW: restore keystore from secret and expose path ---
+      - name: Restore keystore
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No KEYSTORE_BASE64 provided; skipping keystore restore"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
+          echo "Keystore written to $GITHUB_WORKSPACE/keystore.jks"
+          # expose path to subsequent steps
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
+        shell: bash
+
       - name: Build ARM64 Release APK
+        # Gradle will read signing info from env vars (KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD)
         run: gradle :app:assembleRelease --no-daemon
 
       - name: Verify APK
