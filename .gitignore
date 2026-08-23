@@ -1,0 +1,4 @@
+*.jks
+*.keystore
+keystore.jks
+keystore.base64
