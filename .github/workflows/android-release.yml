@@ -2,6 +2,7 @@ name: Universal Performance ARM64 Release
 
 on:
   workflow_dispatch:
+
   push:
     tags:
       - 'v*'
@@ -10,15 +11,19 @@ permissions:
   contents: write
 
 jobs:
+
   build:
+
     runs-on: ubuntu-24.04
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Install Git LFS
+      - name: Git LFS
         run: |
           git lfs install
           git lfs pull
@@ -36,52 +41,120 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Make gradlew executable
+      - name: Make Gradle executable
         run: chmod +x ./gradlew
 
       - name: Repair missing Gradle Wrapper
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "gradle-wrapper.jar is missing; using system Gradle to generate it."
-            gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Gradle wrapper JAR missing."
+            echo "Generating wrapper with system Gradle 8.10.2."
+
+            gradle wrapper \
+              --gradle-version 8.10.2 \
+              --distribution-type bin
           fi
+
           test -f gradle/wrapper/gradle-wrapper.jar
           test -f gradle/wrapper/gradle-wrapper.properties
-          echo "Gradle wrapper is ready."
 
-      - name: Verify Gradle Wrapper
-        shell: bash
+      - name: Verify Gradle
         run: |
-          set -euo pipefail
           chmod +x ./gradlew
-          ls -la gradle/wrapper/
           ./gradlew --version
 
       - name: Clean
-        run: ./gradlew clean --no-daemon
+        run: |
+          ./gradlew clean --no-daemon
+
+      # ------------------------------------------------------
+      # RESTORE PRIVATE SIGNING KEY
+      # ------------------------------------------------------
+
+      - name: Restore release keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR:"
+            echo "KEYSTORE_BASE64 GitHub Secret is missing."
+            echo ""
+            echo "Create the secret before building a signed Release APK."
+            exit 1
+          fi
+
+          echo "$KEYSTORE_BASE64" | base64 --decode \
+            > "$GITHUB_WORKSPACE/keystore.jks"
+
+          test -s "$GITHUB_WORKSPACE/keystore.jks"
+
+          echo "Release keystore restored successfully."
+
+      # ------------------------------------------------------
+      # BUILD
+      # ------------------------------------------------------
 
       - name: Build ARM64 Release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        shell: bash
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          ./gradlew \
+            :app:assembleRelease \
+            --no-daemon \
+            --stacktrace
+
+      # ------------------------------------------------------
+      # VERIFY
+      # ------------------------------------------------------
 
       - name: Verify APK
         shell: bash
         run: |
           set -euo pipefail
-          APK_DIR=app/build/outputs/apk/release
+
+          APK_DIR="app/build/outputs/apk/release"
+
           test -d "$APK_DIR"
+
+          echo "Release directory:"
           ls -lah "$APK_DIR"
-          APK_COUNT=$(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' | wc -l)
+
+          APK_COUNT=$(find "$APK_DIR" \
+            -maxdepth 1 \
+            -type f \
+            -name "*.apk" | wc -l)
+
           if [ "$APK_COUNT" -eq 0 ]; then
-            echo "ERROR: No APK was produced."
+            echo "ERROR: No APK produced."
             exit 1
           fi
+
+          echo "APK count: $APK_COUNT"
+
           for apk in "$APK_DIR"/*.apk; do
+            echo "----------------------------------------"
+            echo "APK: $apk"
+            ls -lh "$apk"
             file "$apk"
           done
 
-      - name: Upload ARM64 APK artifact
+      # ------------------------------------------------------
+      # ARTIFACT
+      # ------------------------------------------------------
+
+      - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
           name: universal-performance-arm64
@@ -89,9 +162,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # ------------------------------------------------------
+      # GITHUB RELEASE
+      # ------------------------------------------------------
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
+
+      # ------------------------------------------------------
+      # CLEAN PRIVATE KEY
+      # ------------------------------------------------------
+
+      - name: Delete temporary keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$GITHUB_WORKSPACE/keystore.jks"
