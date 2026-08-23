@@ -32,7 +32,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
+        run: chmod +x ./gradlew || echo "gradlew not found, skipping chmod"
 
       - name: Build (debug)
         # We build only debug to avoid release signing issues in CI. If you want to build release,
