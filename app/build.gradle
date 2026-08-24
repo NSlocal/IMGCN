@@ -48,30 +48,26 @@ android {
              * into this file.
              */
 
-            def keystorePath =
-    System.getenv("KEYSTORE_PATH")
-    ?: rootProject.file("keystore.jks")
+            def keyPath = System.getenv("KEYSTORE_PATH")
 
-storeFile file(keystorePath)
+if (keyPath != null &&
+    !keyPath.trim().isEmpty() &&
+    file(keyPath).isFile()) {
 
-            if (keyPath != null &&
-                !keyPath.trim().isEmpty() &&
-                file(keyPath).isFile()) {
+    signingConfig = signingConfigs.maybeCreate("release")
 
-                signingConfig = signingConfigs.maybeCreate("release")
+    signingConfig.storeFile = file(keyPath)
 
-                signingConfig.storeFile = file(keyPath)
+    signingConfig.storePassword =
+        System.getenv("KEYSTORE_PASSWORD")
 
-                signingConfig.storePassword =
-                    System.getenv("KEYSTORE_PASSWORD")
+    signingConfig.keyAlias =
+        System.getenv("KEY_ALIAS")
 
-                signingConfig.keyAlias =
-                    System.getenv("KEY_ALIAS")
-
-                signingConfig.keyPassword =
-                    System.getenv("KEY_PASSWORD")
-            }
-
+    signingConfig.keyPassword =
+        System.getenv("KEY_PASSWORD")
+}
+            
             proguardFiles(
                 getDefaultProguardFile(
                     'proguard-android-optimize.txt'
