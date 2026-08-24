@@ -2,7 +2,6 @@ name: Android ARM64 Release
 
 on:
   workflow_dispatch:
-
   push:
     tags:
       - 'v*'
@@ -11,13 +10,10 @@ permissions:
   contents: write
 
 jobs:
-
   build:
-
     runs-on: ubuntu-24.04
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -31,42 +27,14 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
-          set -euo pipefail
-
           yes | sdkmanager --licenses >/dev/null || true
-
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.0.0"
+          sdkmanager             "platform-tools"             "platforms;android-36"             "build-tools;36.0.0"
 
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-
-      - name: Verify Gradle
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          command -v gradle
-          gradle --version
-
-      - name: Check Android project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -f settings.gradle || \
-          test -f settings.gradle.kts
-
-          test -f app/build.gradle || \
-          test -f app/build.gradle.kts
-
-          echo "Android project files found."
 
       - name: Restore optional signing key
         shell: bash
@@ -77,111 +45,33 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
-
           if [ -n "${KEYSTORE_BASE64:-}" ] &&
              [ -n "${KEYSTORE_PASSWORD:-}" ] &&
              [ -n "${KEY_ALIAS:-}" ] &&
              [ -n "${KEY_PASSWORD:-}" ]; then
-
-            echo "$KEYSTORE_BASE64" | base64 --decode \
-              > "$GITHUB_WORKSPACE/keystore.jks"
-
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
             test -s "$GITHUB_WORKSPACE/keystore.jks"
-
-            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" \
-              >> "$GITHUB_ENV"
-
-            echo "KEYSTORE_PRESENT=true" >> "$GITHUB_ENV"
-
-            echo "Complete signing configuration found."
-
-          else
-
-            echo "KEYSTORE_PRESENT=false" >> "$GITHUB_ENV"
-
-            echo "No complete signing configuration."
-            echo "Release will be unsigned."
-
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> "$GITHUB_ENV"
           fi
 
-      - name: Clean
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          gradle clean \
-            --no-daemon \
-            --stacktrace
-
-      - name: Build ARM64 Release
-        shell: bash
+      - name: Build ARM64 release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK
         run: |
           set -euo pipefail
-
-          gradle :app:assembleRelease \
-            --no-daemon \
-            --stacktrace
-
-      - name: Verify ARM64 APK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK_DIR="app/build/outputs/apk/release"
-
-          test -d "$APK_DIR"
-
-          find "$APK_DIR" \
-            -maxdepth 1 \
-            -type f \
-            -name "*.apk" \
-            -print
-
-          APK="$(find "$APK_DIR" \
-            -maxdepth 1 \
-            -type f \
-            -name "*.apk" \
-            -print -quit)"
-
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
           test -n "$APK"
-
-          echo "APK found:"
-          echo "$APK"
-
-          if command -v zipinfo >/dev/null 2>&1; then
-            echo "Checking APK archive..."
-            zipinfo -t "$APK"
-          fi
-
-      - name: Check APK ABI
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK="$(find \
-            app/build/outputs/apk/release \
-            -maxdepth 1 \
-            -type f \
-            -name "*.apk" \
-            -print -quit)"
-
-          if command -v unzip >/dev/null 2>&1; then
-
-            echo "Native ARM64 libraries:"
-            unzip -l "$APK" | \
-              grep "lib/arm64-v8a/" || \
-              echo "No native ARM64 libraries in this APK."
-
-          fi
+          unzip -t "$APK"
 
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: IMGCN-ARM64-release
+          name: Universal-Performance-ARM64-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -194,7 +84,4 @@ jobs:
 
       - name: Remove temporary keystore
         if: always()
-        shell: bash
-        run: |
-          rm -f "$GITHUB_WORKSPACE/keystore.jks"
-          
+        run: rm -f "$GITHUB_WORKSPACE/keystore.jks"
