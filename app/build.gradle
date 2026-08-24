@@ -48,7 +48,11 @@ android {
              * into this file.
              */
 
-            def keyPath = System.getenv("KEYSTORE_PATH")
+            def keystorePath =
+    System.getenv("KEYSTORE_PATH")
+    ?: rootProject.file("keystore.jks")
+
+storeFile file(keystorePath)
 
             if (keyPath != null &&
                 !keyPath.trim().isEmpty() &&
