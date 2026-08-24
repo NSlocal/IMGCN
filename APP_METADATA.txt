@@ -1,11 +1,8 @@
-Universal Performance
 Package: com.universal.performance
-Version: 1.0.0
-
-Speed Drifters
-Package: com.garena.game.fctw
-Version: 1.54.0.26207
-
-QQ飞车
-Package: com.tencent.tmgp.speedmobile
-Version: 1.58.0.50557
+Application: Universal Performance
+Version name: 1.0.2
+Version code: 10002
+Minimum Android: 8.0 (API 26)
+Target/compile SDK: 36
+Primary ABI: arm64-v8a
+Features: FPS overlay, refresh-rate overlay, CPU/GPU info, display info
