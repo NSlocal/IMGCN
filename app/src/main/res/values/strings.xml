@@ -1,25 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
-
 <resources>
-
-    <string name="app_name">
-        Universal Performance
-    </string>
-
-    <string name="service_enabled">
-        Performance monitor enabled
-    </string>
-
-    <string name="service_disabled">
-        Performance monitor disabled
-    </string>
-
-    <string name="start_service">
-        Start performance monitor
-    </string>
-
-    <string name="stop_service">
-        Stop performance monitor
-    </string>
-
+    <string name="app_name">Universal Performance</string>
 </resources>
