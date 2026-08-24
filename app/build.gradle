@@ -8,25 +8,55 @@ android {
 
     defaultConfig {
         applicationId 'com.universal.performance'
+
         minSdk 23
         targetSdk 36
 
-        versionCode 10001
-        versionName '1.0.1'
+        versionCode 10000
+        versionName '1.0.0'
 
         ndk {
             abiFilters 'arm64-v8a'
         }
+
+        multiDexEnabled true
     }
 
-    signingConfigs {
-        release {
-            def keystorePath = System.getenv("KEYSTORE_PATH")
+    /*
+     * Release signing is OPTIONAL.
+     *
+     * When GitHub Actions restores a private keystore,
+     * KEYSTORE_PATH points to the file and the APK is signed.
+     *
+     * When no keystore is configured, no signingConfig is attached.
+     * Gradle can therefore create an unsigned Release APK for testing.
+     *
+     * IMPORTANT:
+     * There is intentionally NO fallback to rootProject.file("keystore.jks").
+     * That fallback caused the current validateSigningRelease failure.
+     */
 
-            if (keystorePath != null &&
-                !keystorePath.isEmpty()) {
+    def releaseKeystorePath =
+        System.getenv("KEYSTORE_PATH")
 
-                storeFile file(keystorePath)
+    def releaseKeystoreFile = null
+
+    if (releaseKeystorePath != null &&
+        !releaseKeystorePath.trim().isEmpty()) {
+
+        def candidate =
+            file(releaseKeystorePath)
+
+        if (candidate.isFile()) {
+            releaseKeystoreFile = candidate
+        }
+    }
+
+    if (releaseKeystoreFile != null) {
+
+        signingConfigs {
+            release {
+                storeFile releaseKeystoreFile
 
                 storePassword System.getenv(
                     "KEYSTORE_PASSWORD"
@@ -45,31 +75,19 @@ android {
 
     buildTypes {
 
-        debug {
-            minifyEnabled false
-            shrinkResources false
-            debuggable true
-        }
-
         release {
             minifyEnabled false
             shrinkResources false
+
             debuggable false
             jniDebuggable false
+
             zipAlignEnabled true
 
             /*
-             * Do not force a missing keystore.
-             *
-             * If GitHub Actions provides KEYSTORE_PATH,
-             * Gradle signs the Release APK.
-             *
-             * If it is absent, assembleRelease can still
-             * create an unsigned Release APK for testing.
+             * Only sign when a real keystore was restored.
              */
-            if (System.getenv("KEYSTORE_PATH") != null &&
-                !System.getenv("KEYSTORE_PATH").isEmpty()) {
-
+            if (releaseKeystoreFile != null) {
                 signingConfig signingConfigs.release
             }
 
@@ -79,6 +97,12 @@ android {
                 ),
                 'proguard-rules.pro'
             )
+        }
+
+        debug {
+            minifyEnabled false
+            shrinkResources false
+            debuggable true
         }
     }
 
@@ -93,4 +117,8 @@ android {
             ]
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.multidex:multidex:2.0.1'
 }
