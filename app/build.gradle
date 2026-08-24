@@ -9,86 +9,63 @@ android {
     defaultConfig {
         applicationId 'com.universal.performance'
 
-        minSdk 23
+        minSdk 26
         targetSdk 36
 
-        versionCode 10000
-        versionName '1.0.0'
+        versionCode 10001
+        versionName '1.0.1'
 
         ndk {
             abiFilters 'arm64-v8a'
         }
-
-        multiDexEnabled true
-    }
-
-    /*
-     * Release signing is OPTIONAL.
-     *
-     * When GitHub Actions restores a private keystore,
-     * KEYSTORE_PATH points to the file and the APK is signed.
-     *
-     * When no keystore is configured, no signingConfig is attached.
-     * Gradle can therefore create an unsigned Release APK for testing.
-     *
-     * IMPORTANT:
-     * There is intentionally NO fallback to rootProject.file("keystore.jks").
-     * That fallback caused the current validateSigningRelease failure.
-     */
-
-    def releaseKeystorePath =
-        System.getenv("KEYSTORE_PATH")
-
-    def releaseKeystoreFile = null
-
-    if (releaseKeystorePath != null &&
-        !releaseKeystorePath.trim().isEmpty()) {
-
-        def candidate =
-            file(releaseKeystorePath)
-
-        if (candidate.isFile()) {
-            releaseKeystoreFile = candidate
-        }
-    }
-
-    if (releaseKeystoreFile != null) {
-
-        signingConfigs {
-            release {
-                storeFile releaseKeystoreFile
-
-                storePassword System.getenv(
-                    "KEYSTORE_PASSWORD"
-                )
-
-                keyAlias System.getenv(
-                    "KEY_ALIAS"
-                )
-
-                keyPassword System.getenv(
-                    "KEY_PASSWORD"
-                )
-            }
-        }
     }
 
     buildTypes {
+        debug {
+            minifyEnabled false
+            shrinkResources false
+            debuggable true
+        }
 
         release {
             minifyEnabled false
             shrinkResources false
-
             debuggable false
             jniDebuggable false
-
             zipAlignEnabled true
 
             /*
-             * Only sign when a real keystore was restored.
+             * IMPORTANT:
+             * No keystore fallback is used here.
+             *
+             * The GitHub Actions workflow may attach signing through
+             * an environment-provided keystore.
+             *
+             * Do NOT put:
+             *
+             * ?: rootProject.file("keystore.jks")
+             *
+             * into this file.
              */
-            if (releaseKeystoreFile != null) {
-                signingConfig signingConfigs.release
+
+            def keyPath = System.getenv("KEYSTORE_PATH")
+
+            if (keyPath != null &&
+                !keyPath.trim().isEmpty() &&
+                file(keyPath).isFile()) {
+
+                signingConfig = signingConfigs.maybeCreate("release")
+
+                signingConfig.storeFile = file(keyPath)
+
+                signingConfig.storePassword =
+                    System.getenv("KEYSTORE_PASSWORD")
+
+                signingConfig.keyAlias =
+                    System.getenv("KEY_ALIAS")
+
+                signingConfig.keyPassword =
+                    System.getenv("KEY_PASSWORD")
             }
 
             proguardFiles(
@@ -97,12 +74,6 @@ android {
                 ),
                 'proguard-rules.pro'
             )
-        }
-
-        debug {
-            minifyEnabled false
-            shrinkResources false
-            debuggable true
         }
     }
 
@@ -117,8 +88,4 @@ android {
             ]
         }
     }
-}
-
-dependencies {
-    implementation 'androidx.multidex:multidex:2.0.1'
 }
