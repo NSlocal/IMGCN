@@ -1,25 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <resources>
-
-    <style
-        name="AppTheme"
-        parent="android:style/Theme.Material.Light.NoActionBar">
-
-        <item name="android:fontFamily">sans</item>
-
-        <item name="android:windowActionModeOverlay">
-            true
-        </item>
-
-        <item name="android:windowNoTitle">
-            true
-        </item>
-
-        <item name="android:windowDisablePreview">
-            true
-        </item>
-
-    </style>
-
+    <string name="app_name">Universal Performance</string>
+    <string name="notif_channel">Universal Performance</string>
+    <string name="notif_text">Anti Lag • Anti Freeze • GPU Opt — Aktif</string>
 </resources>
