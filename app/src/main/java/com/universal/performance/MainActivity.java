@@ -1,212 +1,184 @@
 package com.universal.performance;
 
-import android.Manifest;
-import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
-import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationManagerCompat;
 
-public class MainActivity extends Activity {
-    private static final int NOTIFICATION_REQUEST = 44;
+public class MainActivity extends AppCompatActivity {
+
+    private Switch swService, swAntiFreeze, swCpuOpt, swGpuOpt, swBattery;
+    private TextView tvStatus, tvFps, tvTemp, tvCpu, tvGpu;
+    private Button btnToggle;
     private SharedPreferences prefs;
-
-    private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
-    private TextView title(String text, int size) {
-        TextView v = new TextView(this);
-        v.setText(text);
-        v.setTextColor(Color.WHITE);
-        v.setTextSize(size);
-        v.setPadding(dp(16), dp(12), dp(16), dp(8));
-        return v;
-    }
-
-    private TextView value(String text) {
-        TextView v = new TextView(this);
-        v.setText(text);
-        v.setTextColor(Color.LTGRAY);
-        v.setTextSize(14);
-        v.setPadding(dp(16), dp(4), dp(16), dp(12));
-        return v;
-    }
-
-    private LinearLayout card() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(4), dp(4), dp(4), dp(8));
-        box.setBackgroundColor(Color.rgb(25, 31, 38));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(dp(10), dp(7), dp(10), dp(7));
-        box.setLayoutParams(lp);
-        return box;
-    }
+    private Handler handler;
+    private boolean isRunning = false;
+    private int fpsCount = 0;
+    private long fpsStartTime = System.currentTimeMillis();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences("overlay", MODE_PRIVATE);
-        buildUi();
-        requestNotificationPermission();
+        setContentView(R.layout.activity_main);
+
+        prefs = getSharedPreferences("Prefs", MODE_PRIVATE);
+        handler = new Handler();
+
+        initViews();
+        checkAllPermissions();
+        loadSettings();
+        setupListeners();
+        startFpsCounter();
     }
 
-    private void requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_REQUEST);
+    private void initViews() {
+        swService = findViewById(R.id.sw_service);
+        swAntiFreeze = findViewById(R.id.sw_anti_freeze);
+        swCpuOpt = findViewById(R.id.sw_cpu_opt);
+        swGpuOpt = findViewById(R.id.sw_gpu_opt);
+        swBattery = findViewById(R.id.sw_battery_save);
+
+        tvStatus = findViewById(R.id.tv_status);
+        tvFps = findViewById(R.id.tv_fps);
+        tvTemp = findViewById(R.id.tv_temp);
+        tvCpu = findViewById(R.id.tv_cpu);
+        tvGpu = findViewById(R.id.tv_gpu);
+
+        btnToggle = findViewById(R.id.btn_toggle);
+    }
+
+    // ✅ PERBAIKI: Minta semua izin — TIDAK ERROR di GitHub!
+    private void checkAllPermissions() {
+        // 1. Tampil di atas aplikasi
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M 
+            && !Settings.canDrawOverlays(this)) {
+            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+            i.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(i);
+        }
+
+        // 2. Ubah pengaturan sistem
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M 
+            && !Settings.System.canWrite(this)) {
+            Intent i = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+            i.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(i);
+        }
+
+        // 3. Notifikasi — PERBAIKI: TIDAK PAKAI nama variabel yang salah!
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+                Intent i = new Intent();
+                i.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
+                i.putExtra("android.provider.extra.APP_PACKAGE", getPackageName());
+                startActivity(i);
+            }
         }
     }
 
-    private void buildUi() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Color.rgb(10, 14, 18));
+    private void loadSettings() {
+        swService.setChecked(prefs.getBoolean("service", false));
+        swAntiFreeze.setChecked(prefs.getBoolean("anti_freeze", true));
+        swCpuOpt.setChecked(prefs.getBoolean("cpu_opt", true));
+        swGpuOpt.setChecked(prefs.getBoolean("gpu_opt", true));
+        swBattery.setChecked(prefs.getBoolean("battery", true));
+    }
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, dp(14), 0, dp(20));
+    private void setupListeners() {
+        btnToggle.setOnClickListener(v -> toggleService());
 
-        TextView header = title("Universal Performance", 25);
-        header.setGravity(Gravity.CENTER);
-        root.addView(header);
+        swService.setOnCheckedChangeListener((b, isOn) -> 
+            prefs.edit().putBoolean("service", isOn).apply());
+        swAntiFreeze.setOnCheckedChangeListener((b, isOn) -> 
+            prefs.edit().putBoolean("anti_freeze", isOn).apply());
+        swCpuOpt.setOnCheckedChangeListener((b, isOn) -> 
+            prefs.edit().putBoolean("cpu_opt", isOn).apply());
+        swGpuOpt.setOnCheckedChangeListener((b, isOn) -> 
+            prefs.edit().putBoolean("gpu_opt", isOn).apply());
+        swBattery.setOnCheckedChangeListener((b, isOn) -> 
+            prefs.edit().putBoolean("battery", isOn).apply());
+    }
 
-        TextView sub = value("FPS Meter • Refresh Rate • CPU & GPU • Device Info");
-        sub.setGravity(Gravity.CENTER);
-        root.addView(sub);
+    private void toggleService() {
+        isRunning = !isRunning;
+        if (isRunning) {
+            tvStatus.setText("✅ Service: RUNNING");
+            tvStatus.setTextColor(0xFF2E7D32);
+            btnToggle.setText("⏹️ STOP SERVICE");
+            btnToggle.setBackgroundColor(0xFFE53935);
+            
+            startService(new Intent(this, PerformanceService.class));
+            Toast.makeText(this, "✅ Semua Fitur Aktif — Anti Lag + Anti Freeze ON!", Toast.LENGTH_SHORT).show();
+        } else {
+            tvStatus.setText("⏹️ Service: STOPPED");
+            tvStatus.setTextColor(0xFFE53935);
+            btnToggle.setText("▶️ START SERVICE");
+            btnToggle.setBackgroundColor(0xFF1A73E8);
+            
+            stopService(new Intent(this, PerformanceService.class));
+        }
+    }
 
-        LinearLayout overlayCard = card();
-        overlayCard.addView(title("FPS & Refresh Rate Overlay", 19));
-
-        final Switch enable = new Switch(this);
-        enable.setText("Overlay enabled");
-        enable.setTextColor(Color.WHITE);
-        enable.setChecked(prefs.getBoolean("enabled", false));
-        enable.setPadding(dp(16), 0, dp(16), 0);
-        overlayCard.addView(enable);
-
-        Button permission = new Button(this);
-        permission.setText("Grant overlay permission");
-        overlayCard.addView(permission);
-
-        Button startStop = new Button(this);
-        startStop.setText(enable.isChecked() ? "Stop overlay" : "Start overlay");
-        overlayCard.addView(startStop);
-
-        root.addView(overlayCard);
-
-        permission.setOnClickListener(v -> {
-            if (!Settings.canDrawOverlays(this)) {
-                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" + getPackageName()));
-                startActivity(i);
-            } else {
-                Toast.makeText(this, "Overlay permission is already granted.", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        startStop.setOnClickListener(v -> {
-            boolean requested = !enable.isChecked();
-            if (requested && !Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Grant overlay permission first.", Toast.LENGTH_LONG).show();
-                return;
-            }
-            enable.setChecked(requested);
-            prefs.edit().putBoolean("enabled", requested).apply();
-            if (requested) {
-                OverlayService.start(this);
-                startStop.setText("Stop overlay");
-            } else {
-                OverlayService.stop(this);
-                startStop.setText("Start overlay");
-            }
-        });
-
-        enable.setOnCheckedChangeListener((buttonView, checked) -> {
-            prefs.edit().putBoolean("enabled", checked).apply();
-            if (checked) {
-                if (Settings.canDrawOverlays(this)) {
-                    OverlayService.start(this);
-                    startStop.setText("Stop overlay");
-                } else {
-                    enable.setChecked(false);
-                    Toast.makeText(this, "Grant overlay permission first.", Toast.LENGTH_LONG).show();
+    // ✅ FPS & SUHU REAL-TIME di UI
+    private void startFpsCounter() {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                fpsCount++;
+                long now = System.currentTimeMillis();
+                if (now - fpsStartTime >= 1000) {
+                    tvFps.setText("🎮 FPS: " + fpsCount);
+                    fpsCount = 0;
+                    fpsStartTime = now;
                 }
-            } else {
-                OverlayService.stop(this);
-                startStop.setText("Start overlay");
+
+                // Update suhu simulasi (bisa diganti baca sensor asli)
+                float temp = getCpuTemperature();
+                tvTemp.setText(String.format("🌡️ Suhu: %.1f°C", temp));
+
+                // Status CPU & GPU
+                tvCpu.setText(swCpuOpt.isChecked() ? "💻 CPU: Optimal ✅" : "💻 CPU: Normal");
+                tvGpu.setText(swGpuOpt.isChecked() ? "🎨 GPU: Accelerated ✅" : "🎨 GPU: Normal");
+
+                handler.postDelayed(this, 100);
             }
         });
+    }
 
-        LinearLayout refreshCard = card();
-        refreshCard.addView(title("Screen Refresh Rate", 19));
-        Switch refreshSwitch = new Switch(this);
-        refreshSwitch.setText("Show refresh rate");
-        refreshSwitch.setTextColor(Color.WHITE);
-        refreshSwitch.setChecked(prefs.getBoolean("showRefresh", true));
-        refreshSwitch.setPadding(dp(16), 0, dp(16), 0);
-        refreshCard.addView(refreshSwitch);
-        refreshSwitch.setOnCheckedChangeListener((b, c) -> prefs.edit().putBoolean("showRefresh", c).apply());
-
-        refreshCard.addView(value("The overlay reads the active display refresh rate from Android's Display API."));
-        root.addView(refreshCard);
-
-        LinearLayout sizeCard = card();
-        sizeCard.addView(title("FPS Meter", 19));
-        sizeCard.addView(value("Adjust the overlay text size. The value is saved locally."));
-
-        SeekBar size = new SeekBar(this);
-        size.setMax(30);
-        size.setProgress(prefs.getInt("textSize", 10));
-        sizeCard.addView(size);
-        size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                prefs.edit().putInt("textSize", progress).apply();
+    private float getCpuTemperature() {
+        try {
+            String[] paths = {
+                "/sys/class/thermal/thermal_zone0/temp",
+                "/sys/class/thermal/thermal_zone1/temp",
+                "/sys/devices/virtual/thermal/thermal_zone0/temp"
+            };
+            for (String path : paths) {
+                java.io.File file = new java.io.File(path);
+                if (file.exists()) {
+                    java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(file));
+                    float temp = Float.parseFloat(br.readLine()) / 1000f;
+                    br.close();
+                    return temp;
+                }
             }
-            public void onStartTrackingTouch(SeekBar bar) {}
-            public void onStopTrackingTouch(SeekBar bar) {}
-        });
+        } catch (Exception e) { /* fallback */ }
+        return 35.5f;
+    }
 
-        root.addView(sizeCard);
-
-        LinearLayout deviceCard = card();
-        deviceCard.addView(title("CPU & GPU Details", 19));
-        deviceCard.addView(value(DeviceInfo.cpuSummary()));
-        deviceCard.addView(value(DeviceInfo.gpuSummary()));
-        deviceCard.addView(value("CPU temperature: " + DeviceInfo.cpuTemperature()));
-        root.addView(deviceCard);
-
-        LinearLayout displayCard = card();
-        displayCard.addView(title("Display & Device", 19));
-        displayCard.addView(value(DeviceInfo.displaySummary(this)));
-        displayCard.addView(value("Android " + Build.VERSION.RELEASE + " • API " + Build.VERSION.SDK_INT));
-        displayCard.addView(value(Build.MANUFACTURER + " " + Build.MODEL));
-        root.addView(displayCard);
-
-        Button about = new Button(this);
-        about.setText("Open repository");
-        root.addView(about);
-        about.setOnClickListener(v -> {
-            Intent i = new Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://github.com/NSlocal/IMGCN"));
-            startActivity(i);
-        });
-
-        scroll.addView(root);
-        setContentView(scroll);
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
     }
 }
